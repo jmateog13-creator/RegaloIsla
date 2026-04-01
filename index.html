@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Isla: Rey del Ajedrez (Graphic Adventure Edition) 👑</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --secondary: #fdcb6e;
+            --accent: #fab1a0;
+            --panel-bg: rgba(255, 255, 255, 0.15);
+            --bubble-bg: rgba(255, 255, 255, 0.95);
+            --text: #2d3436;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+
+        body {
+            background: linear-gradient(135deg, #2d3436 0%, #636e72 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            padding: 0;
+        }
+
+        #game-frame {
+            width: 95vw;
+            height: 90vh;
+            max-width: 1400px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 40px;
+            display: flex;
+            overflow: hidden;
+            box-shadow: 0 30px 100px rgba(0,0,0,0.5);
+            border: 4px solid rgba(255,255,255,0.1);
+        }
+
+        /* NPC Portrait (LEFT) */
+        #npc-portrait {
+            flex: 0 0 45%;
+            position: relative;
+            background: #1e272e;
+            overflow: hidden;
+            border-right: 2px solid rgba(255,255,255,0.1);
+        }
+
+        #npc-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Retrato de gran tamaño */
+            object-position: top center;
+            filter: drop-shadow(0 0 20px rgba(0,0,0,0.5));
+        }
+
+        #king-name-tag {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--secondary);
+            color: var(--text);
+            padding: 15px 40px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 1.8rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            white-space: nowrap;
+            z-index: 10;
+        }
+
+        /* Interaction Panel (RIGHT) */
+        #interaction-hud {
+            flex: 1;
+            padding: 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background: linear-gradient(to bottom, rgba(45, 52, 54, 0.4), rgba(108, 92, 231, 0.2));
+            position: relative;
+        }
+
+        #volume-control {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            background: rgba(255,255,255,0.1);
+            padding: 12px 25px;
+            border-radius: 40px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            color: white;
+            font-weight: 700;
+        }
+        #volume-slider { accent-color: var(--secondary); cursor: pointer; }
+
+        #dialogue-box {
+            background: var(--bubble-bg);
+            padding: 40px;
+            border-radius: 35px;
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--primary);
+            line-height: 1.3;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            text-align: center;
+            margin-top: 20px;
+            position: relative;
+        }
+
+        #dialogue-box::before {
+            content: '';
+            position: absolute;
+            left: -20px;
+            top: 50%;
+            transform: translateY(-50%);
+            border-width: 0 20px 20px 0;
+            border-style: solid;
+            border-color: transparent var(--bubble-bg) transparent transparent;
+        }
+
+        #question-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 40px;
+        }
+
+        .btn-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 25px;
+        }
+
+        .huge-btn {
+            background: white;
+            border: none;
+            padding: 40px 30px;
+            border-radius: 30px;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 0 #dfe6e9;
+        }
+
+        .huge-btn:hover { transform: scale(1.02); background: #fdfdfd; }
+        .huge-btn:active { transform: translateY(10px); box-shadow: 0 0 0 #dfe6e9; }
+        .huge-btn.primary { background: linear-gradient(135deg, #fab1a0, #e17055); color: white; box-shadow: 0 10px 0 #c0392b; }
+        .huge-btn.secondary { background: linear-gradient(135deg, #74b9ff, #0984e3); color: white; box-shadow: 0 10px 0 #2980b9; }
+        
+        .disabled { pointer-events: none; opacity: 0.8; }
+
+        /* Progress HUD */
+        #progress-hud { margin-top: 20px; }
+        #progress-bar {
+            width: 100%; height: 20px; background: rgba(255,255,255,0.1);
+            border-radius: 15px; overflow: hidden; border: 2px solid rgba(255,255,255,0.2);
+        }
+        #progress-fill { height: 100%; background: var(--secondary); width: 0%; transition: width 0.7s ease; }
+
+        /* Overlays */
+        #start-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #6c5ce7; display: flex; flex-direction: column; justify-content: center;
+            align-items: center; z-index: 100; color: white; text-align: center;
+        }
+
+        #final-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.98); display: none; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 200;
+        }
+
+        video {
+            width: 90%; max-width: 1000px; border-radius: 30px; border: 10px solid white;
+            box-shadow: 0 0 80px rgba(108, 92, 231, 0.4);
+        }
+
+        @media (max-width: 1100px) {
+            #game-frame { flex-direction: column; height: 95vh; }
+            #npc-portrait { flex: 0 0 50%; border-right: none; border-bottom: 2px solid rgba(255,255,255,0.1); }
+            #dialogue-box::before { display: none; }
+            .huge-btn { padding: 25px; font-size: 1.5rem; }
+            #dialogue-box { font-size: 1.6rem; padding: 25px; }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.9; }
+        }
+    </style>
+</head>
+<body>
+
+    <audio id="bg-music" loop>
+        <source src="audio/Juego de Ajedrez.mp3" type="audio/mpeg">
+    </audio>
+
+    <div id="start-overlay">
+        <h1 style="font-size: 5rem; margin-bottom: 30px; text-shadow: 0 5px 15px rgba(0,0,0,0.3);">¡Hola Isla! 👋</h1>
+        <p style="font-size: 2.2rem; margin-bottom: 50px; opacity: 0.9;">¿Estás listo para esta gran aventura musical?</p>
+        <button class="huge-btn primary" style="width: 400px; height: 120px;" onclick="startGame()">¡SÍ, VAMOS!</button>
+    </div>
+
+    <div id="game-frame">
+        <!-- PORTRAIT PANEL -->
+        <div id="npc-portrait">
+            <img id="npc-img" src="img/reylego.png" alt="Rey Lego">
+            <div id="king-name-tag">El Rey Lego</div>
+        </div>
+
+        <!-- HUD PANEL -->
+        <div id="interaction-hud">
+            <div id="volume-control">
+                <label>🔊</label>
+                <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.1">
+            </div>
+
+            <div id="dialogue-box">¡Hola campeón! ¿Listo para el desafío?</div>
+            
+            <div id="question-area">
+                <div class="btn-container">
+                    <button id="btn-0" class="huge-btn primary" onclick="checkAnswer(0)">Opcion 1</button>
+                    <button id="btn-1" class="huge-btn secondary" onclick="checkAnswer(1)">Opcion 2</button>
+                </div>
+            </div>
+
+            <div id="progress-hud">
+                <div id="progress-bar"><div id="progress-fill"></div></div>
+                <p style="color: rgba(255,255,255,0.7); margin-top: 10px; font-weight: 700; text-align: center;">NIVEL DE MAESTRO: ISLA</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="final-overlay">
+        <h1 style="color: white; font-size: 4rem; margin-bottom: 30px;">🌟 ¡LO LOGRASTE, MAESTRO ISLA! 🌟</h1>
+        <video id="final-video" controls>
+            <source src="img/videofinal.mp4" type="video/mp4">
+        </video>
+        <p style="color: #fdcb6e; font-size: 2.2rem; font-weight: 700; margin-top: 20px; text-shadow: 0 0 20px rgba(253, 203, 110, 0.4); animation: pulse 2s infinite;">DALE AL PLAY PARA PODER VER EL REGALO</p>
+        <button class="huge-btn primary" style="margin-top: 40px; width: 350px;" onclick="location.reload()">¿Otra aventura?</button>
+    </div>
+
+    <script>
+        const questionPool = [
+            { q: "¡Hola, Isla! ¿Me ayudas a encontrar al más pequeñito y valiente de mis amigos?", options: ["El Peón", "El Rey"], ans: "El Peón", ok: "¡Eres un genio, Isla! ¡Ese es el peoncito valiente!" },
+            { q: "¿Quién tiene una cruz en la cabeza y es el jefe de todos?", options: ["El Rey", "El Caballo"], ans: "El Rey", ok: "¡Eso es, el Rey es el jefe! ¡Enséñale a Calma cómo se hace!" },
+            { q: "¡Eh Isla! ¿Quién salta como un conejito por encima de las piezas?", options: ["El Caballo", "La Torre"], ans: "El Caballo", ok: "¡Qué grande eres, Isla! ¡Boing, boing, el caballo!" },
+            { q: "¿Qué pieza parece un castillo muy fuerte donde podrías vivir con Calma?", options: ["La Torre", "El Alfil"], ans: "La Torre", ok: "¡Eres el rey del tablero! ¡La torre es un castillo genial!" },
+            { q: "¿Quién es la más poderosa y corre por todo el tablero, Isla?", options: ["La Reina", "El Peón"], ans: "La Reina", ok: "¡Increíble! ¡La Reina puede ir a cualquier parte!" },
+            { q: "¿Quién lleva un gorrito con un punto y camina siempre de lado?", options: ["El Alfil", "El Rey"], ans: "El Alfil", ok: "¡Tachán! ¡El Alfil va por los caminos de colores!" },
+            { q: "¡Isla! ¿A cuántos caballos tengo en mi equipo? ¿Sabes contarlos?", options: ["Dos", "Diez"], ans: "Dos", ok: "¡Dos caballitos saltarines! ¡Lo estás haciendo súper bien!" },
+            { q: "Isla y Calma, ¿de qué color son los cuadritos del suelo del ajedrez?", options: ["Blancas y negras", "Azules y rosas"], ans: "Blancas y negras", ok: "¡Exacto! ¡Como una cebra! ¡Qué listos sois Isla y Calma!" },
+            { q: "¿Quién se mueve solo un pasito muy corto hacia adelante?", options: ["El Peón", "La Reina"], ans: "El Peón", ok: "¡Ese peoncito es pequeño pero muy valiente, eh Isla!" },
+            { q: "¿Cuántos cuadritos tiene un tablero? ¿Muchos o pocos?", options: ["¡Muchísimos!", "Solo dos"], ans: "¡Muchísimos!", ok: "¡Eso es! Tenemos 64 casillas para jugar juntos." },
+            { q: "¿Quién empieza siempre a jugar la partida?", options: ["Las blancas", "Las negras"], ans: "Las blancas", ok: "¡Muy bien Campeón! ¡Las blancas dan el primer paso!" },
+            { q: "¿El Alfil va siempre por su caminito de color?", options: ["Sí, siempre", "No"], ans: "Sí, siempre", ok: "¡Isla, eres el mejor! El Alfil nunca cambia de color." },
+            { q: "¿A quién hay que proteger siempre para no perder?", options: ["Al Rey", "Al Peón"], ans: "Al Rey", ok: "¡Exacto! ¡El Rey es al que más cuidamos!" },
+            { q: "¿El Rey se puede esconder en su torre para estar seguro?", options: ["¡Sí, se esconde!", "No"], ans: "¡Sí, se esconde!", ok: "¡Eso se llama enroque, Isla! ¡Qué bien lo sabes!" },
+            { q: "¿La Reina corre mucho o corre poco?", options: ["Corre muchísimo", "Casi nada"], ans: "Corre muchísimo", ok: "¡Es la más veloz de todas las piezas!" },
+            { q: "¿Los peones son como soldaditos valientes?", options: ["¡Sí!", "No"], ans: "¡Sí!", ok: "¡Son mis pequeños guerreros favoritos, como tú Isla!" },
+            { q: "¿Se usa un reloj en el ajedrez para contar el tiempo?", options: ["Sí", "No"], ans: "Sí", ok: "¡Tic-tac! El reloj nos dice cuándo mover." },
+            { q: "¿Saludamos al amigo antes de empezar a jugar?", options: ["Sí, siempre", "No"], ans: "Sí, siempre", ok: "¡Muy bien! Isla y Calma son siempre muy educados." },
+            { q: "¿Hay que estar en silencio para que el cerebro piense?", options: ["Sí", "No"], ans: "Sí", ok: "¡Shhh! Concentrados somos invencibles." },
+            { q: "¿Cómo se llama cada cuadrito del suelo?", options: ["Casilla", "Ventana"], ans: "Casilla", ok: "¡Eso es! Cada casilla tiene su nombre." },
+            { q: "¿El Peón puede hacerse Reina si llega al final?", options: ["¡Sí, se transforma!", "No"], ans: "¡Sí, se transforma!", ok: "¡Es como magia! ¡Se hace súper poderoso!" },
+            { q: "¿Las piezas se \"comen\" entre ellas en el juego?", options: ["¡Sí, ñam ñam!", "No"], ans: "¡Sí, ñam ñam!", ok: "¡Capturamos las piezas para ganar espacio!" },
+            { q: "¿La torre se mueve en línea recta o da vueltas?", options: ["En línea recta", "Da vueltas"], ans: "En línea recta", ok: "¡Muy bien Isla! Por filas y columnas." },
+            { q: "¿Jugamos todos juntos en el equipo de Isla?", options: ["¡SÍ, EQUIPO!", "No"], ans: "¡SÍ, EQUIPO!", ok: "¡Eso es! Isla y Calma sois el mejor equipo." },
+            { q: "¡Isla, has llegado al final! ¿Estás listo para el regalo?", options: ["¡SÍ! ¡ESTOY LISTO!", "No"], ans: "¡SÍ! ¡ESTOY LISTO!", ok: "¡Lo lograste, Isla! ¡Eres un campeón! ¡Calma, venid a ver!" }
+        ];
+
+        let selectedQuestions = [];
+        let currentQuestion = 0;
+        let isSpeaking = false;
+        const music = document.getElementById('bg-music');
+        const vSlider = document.getElementById('volume-slider');
+        const dialogue = document.getElementById('dialogue-box');
+        const btn0 = document.getElementById('btn-0');
+        const btn1 = document.getElementById('btn-1');
+        const kingImg = document.getElementById('npc-img');
+
+        vSlider.oninput = () => { music.volume = vSlider.value; };
+
+        function getRandom10() {
+            let pool = [...questionPool];
+            let list = [];
+            let finalQ = pool.pop(); 
+            for(let i=0; i<9; i++) {
+                let idx = Math.floor(Math.random() * pool.length);
+                list.push(pool.splice(idx, 1)[0]);
+            }
+            list.push(finalQ);
+            let randomOrder = list.slice(0, 9).sort(() => Math.random() - 0.5);
+            randomOrder.push(finalQ);
+
+            return randomOrder.map(q => {
+                let shuffled = [...q.options].sort(() => Math.random() - 0.5);
+                return { ...q, options: shuffled, correctIdx: shuffled.indexOf(q.ans) };
+            });
+        }
+
+        function speak(text, callback) {
+            window.speechSynthesis.cancel();
+            const msg = new SpeechSynthesisUtterance();
+            msg.text = text; msg.lang = 'es-ES'; msg.rate = 0.75; msg.pitch = 1.1;
+            isSpeaking = true;
+            msg.onend = () => { isSpeaking = false; if (callback) callback(); };
+            window.speechSynthesis.speak(msg);
+        }
+
+        function startGame() {
+            selectedQuestions = getRandom10();
+            music.volume = 0.1;
+            music.play();
+            gsap.to("#start-overlay", { opacity: 0, scale: 1.1, duration: 0.8, onComplete: () => {
+                document.getElementById('start-overlay').style.display = 'none';
+                loadQuestion();
+            }});
+        }
+
+        function loadQuestion() {
+            if(currentQuestion >= selectedQuestions.length) { showFinal(); return; }
+            const q = selectedQuestions[currentQuestion];
+            dialogue.textContent = q.q;
+            btn0.textContent = q.options[0];
+            btn1.textContent = q.options[1];
+            
+            document.getElementById('interaction-hud').classList.remove('disabled');
+            gsap.fromTo("#interaction-hud", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6 });
+            
+            speak(q.q);
+            document.getElementById('progress-fill').style.width = ((currentQuestion) / selectedQuestions.length * 100) + "%";
+        }
+
+        function checkAnswer(idx) {
+            if (isSpeaking) return;
+            const q = selectedQuestions[currentQuestion];
+            if(idx === q.correctIdx) {
+                document.getElementById('interaction-hud').classList.add('disabled');
+                dialogue.textContent = q.ok;
+                
+                // Efecto de alegría aventura gráfica
+                gsap.to(kingImg, { scale: 1.05, filter: "brightness(1.3)", duration: 0.3, yoyo: true, repeat: 3 });
+                
+                speak(q.ok, () => {
+                    setTimeout(() => { currentQuestion++; loadQuestion(); }, 600);
+                });
+            } else {
+                const fail = "¡Casi, Isla! ¡Piénsalo otra vez con Calma, tú puedes!";
+                dialogue.textContent = fail;
+                gsap.to(kingImg, { x: 10, repeat: 7, yoyo: true, duration: 0.05, filter: "brightness(0.8)" });
+                speak(fail);
+            }
+        }
+
+        function showFinal() {
+            music.pause();
+            document.getElementById('final-overlay').style.display = 'flex';
+            document.getElementById('progress-fill').style.width = "100%";
+            confetti({ particleCount: 300, spread: 200, origin: { y: 0.6 } });
+            speak("¡Lo lograste, Isla! ¡Eres un gran campeón! ¡Calma, venid a ver vuestro regalo de los tíos!");
+            // document.getElementById('final-video').play(); // Remitido por petición del usuario para no sonar automáticamente
+        }
+
+        // Animación suave de respiración para el retrato
+        gsap.to(kingImg, { scale: 1.02, duration: 4, repeat: -1, yoyo: true, ease: "sine.inOut" });
+    </script>
+</body>
+</html>
